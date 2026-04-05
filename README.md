@@ -1,40 +1,16 @@
-# CML
-> **Cognitive Mediation Layer** — by Sorabbyngo Labs · *Rhythm of Digital Life*
+# CML — Cognitive Mediation Layer
+> **AI Safety and Alignment Layer** — Sorabbyngo Labs
 
-## What is CML?
-CML is the safety and alignment layer between AI agents and users in SORABBYNGO OS. It mediates all communication between Byngox agents and the outside world — filtering, validating, and ensuring outputs meet safety and privacy requirements including Kenya DPA 2019.
+Every output from every Byngox agent passes through CML before reaching users. Safety, privacy, explainability, Kenya DPA 2019 compliance.
 
-## Stack
-| Component | Detail |
+## Functions
+| Function | Detail |
 |---|---|
-| **Safety filtering** | All agent outputs pass through CML |
-| **Privacy compliance** | Kenya DPA 2019 aligned |
-| **Audit logging** | Full trace of agent decisions |
-| **Rate limiting** | Protects users from AI overload |
+| Safety filtering | Constitutional AI filtering on all outputs |
+| Decision validation | High-risk medical decisions need human review |
+| Explainability | Every decision includes reasoning trace |
+| Privacy enforcement | Kenya DPA 2019, HEALTH data classification |
+| Audit logging | Immutable trace of all agent decisions |
+| Uncertainty estimation | Confidence scoring on all outputs |
 
-## Status
-🔵 In development
-
-## Part of SORABBYNGO OS
-```
-┌─────────────────────────────────────────────────┐
-│              SORABBYNGO AI OS                   │
-├─────────────────────────────────────────────────┤
-│  Chameha        — AI personality and interface  │
-├─────────────────────────────────────────────────┤
-│  Novela         — AI health intelligence        │
-├─────────────────────────────────────────────────┤
-│  Byngox         — Swarm reasoning engine        │
-├─────────────────────────────────────────────────┤
-│  CML            — Cognitive mediation layer     │
-├─────────────────────────────────────────────────┤
-│  Byngonet       — Distributed mesh network      │
-├─────────────────────────────────────────────────┤
-│  SORABBYNGO OS  — Custom Linux 6.19.10 kernel   │
-└─────────────────────────────────────────────────┘
-```
-
-## About
-**Sorabbyngo Company** — Kisii, Kenya
-*Building Africa sovereign digital infrastructure — from the kernel up.*
-© 2026 Sorabbyngo Company. All rights reserved.
+**Sorabbyngo Company** — Kisii, Kenya | 2026
