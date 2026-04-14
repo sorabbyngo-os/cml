@@ -6,7 +6,7 @@ Standalone NATS service that enforces privacy and safety on every external API c
 
 ## What it does
 
-- **Safety filter** — blocks harmful content before it reaches Claude API
+- **Safety filter** — blocks harmful content before any Tier 3 external call
 - **Privacy enforcer** — scrubs PII (names, IDs, phone numbers, hashes, paths)
 - **Audit ledger** — append-only, hash-chained log of every CML decision
 

@@ -2,7 +2,7 @@
 """
 filters/privacy.py — CML Privacy Enforcer
 Scrubs PII from any data before it leaves the device.
-Applies to all Tier 3 (Claude API) calls across the OS.
+Applies to all Tier 3 external API calls across the OS.
 """
 
 import re

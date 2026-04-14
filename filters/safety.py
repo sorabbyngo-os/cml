@@ -2,7 +2,7 @@
 """
 filters/safety.py — CML Safety Filter
 Blocks harmful content before any external API call.
-Used by Chameha, Novela, Byngox — any component calling Claude.
+Used by Chameha, Novela, Byngox — any component making Tier 3 calls.
 """
 
 import re
