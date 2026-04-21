@@ -1,19 +1,7 @@
 """
-CML — Audit Ledger (SUID version)
-Hash-chained audit log where every entry has a SUID.
-Entries are immutable — any tampering breaks the chain AND the checksum.
-
-Entry format:
-{
-  "audit_id":   "AUD-20260421-KE047-A3X9KM-7F",  ← SUID
-  "seq":        1,
-  "action":     "CREATE",
-  "entity_id":  "PAT-20260421-KE045-B7X2QR-3K",  ← SUID
-  "actor_id":   "DOC-20260421-KE045-C4M8NP-9W",  ← SUID
-  "timestamp":  "2026-04-21T08:00:00Z",
-  "hash":       "sha256 of this entry + prev hash",
-  "prev_hash":  "sha256 of previous entry",
-}
+CML — Audit Ledger (SUID version) — PATCHED
+Added record() alias so cml_service.py doesn't crash.
+Hash-chained, append-only, SUID entry IDs.
 """
 
 import hashlib
@@ -30,7 +18,6 @@ LEDGER_PATH    = os.environ.get("CML_LEDGER_PATH",
                                 os.path.expanduser("~/.sorabbyngo/cml/audit.jsonl"))
 DEFAULT_REGION = os.environ.get("HOSPITAL_REGION", "KE047")
 
-# Try to import SUID — fall back to timestamp-based ID if not available
 try:
     from suid.generator import SUID
     from suid.registry.prefixes import PREFIX
@@ -43,16 +30,14 @@ except ImportError:
 def _make_audit_id() -> str:
     if SUID_AVAILABLE:
         return SUID.generate(PREFIX.AUDIT, DEFAULT_REGION)
-    from datetime import datetime, timezone
     import secrets, string
-    chars = string.ascii_uppercase + string.digits
+    chars  = string.ascii_uppercase + string.digits
     suffix = "".join(secrets.choice(chars) for _ in range(6))
-    date = datetime.now(timezone.utc).strftime("%Y%m%d")
+    date   = datetime.now(timezone.utc).strftime("%Y%m%d")
     return f"AUD-{date}-{DEFAULT_REGION}-{suffix}-XX"
 
 
 def _hash_entry(entry: dict, prev_hash: str) -> str:
-    """SHA-256 of entry content + previous hash."""
     content = json.dumps(entry, sort_keys=True) + prev_hash
     return hashlib.sha256(content.encode()).hexdigest()
 
@@ -60,24 +45,21 @@ def _hash_entry(entry: dict, prev_hash: str) -> str:
 class AuditLedger:
     """
     Append-only, hash-chained audit ledger.
-    Every entry has a SUID audit_id and is linked to the previous entry.
-    Tampering with any entry breaks the chain.
+    Every entry has a SUID and is linked to the previous entry.
     """
 
     def __init__(self, path: str = LEDGER_PATH):
-        self.path      = Path(path)
+        self.path       = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._prev_hash = self._load_last_hash()
 
     def _load_last_hash(self) -> str:
-        """Load hash of the last entry for chain continuity."""
         if not self.path.exists():
             return "GENESIS"
         try:
             lines = self.path.read_text().strip().splitlines()
             if lines:
-                last = json.loads(lines[-1])
-                return last.get("hash", "GENESIS")
+                return json.loads(lines[-1]).get("hash", "GENESIS")
         except Exception:
             pass
         return "GENESIS"
@@ -93,22 +75,7 @@ class AuditLedger:
         safe:       bool = True,
         region:     str = DEFAULT_REGION,
     ) -> dict:
-        """
-        Append an immutable audit entry to the ledger.
-
-        Args:
-            action:     Action type (CREATE, READ, ALERT, etc.)
-            entity_id:  SUID of entity being acted on
-            actor_id:   SUID of actor (doctor, nurse, system)
-            related_id: SUID of related entity
-            metadata:   Additional context
-            ip_address: Network address for forensics
-            safe:       Whether CML safety filter approved this action
-            region:     Region where action occurred
-
-        Returns:
-            The complete audit entry with hash
-        """
+        """Append an immutable audit entry."""
         audit_id = _make_audit_id()
         seq      = self._current_seq() + 1
 
@@ -126,18 +93,33 @@ class AuditLedger:
             "metadata":   metadata or {},
             "prev_hash":  self._prev_hash,
         }
-
         entry["hash"] = _hash_entry(
             {k: v for k, v in entry.items() if k != "hash"},
             self._prev_hash,
         )
-
         self._write(entry)
         self._prev_hash = entry["hash"]
-
-        log.info("[CMLLedger] %s | %s | %s | seq=%d",
-                 action, entity_id, audit_id, seq)
+        log.info("[CMLLedger] %s | %s | seq=%d", action, entity_id, seq)
         return entry
+
+    def record(self, data: dict) -> dict:
+        """
+        Alias called by cml_service.py.
+        Maps legacy record() dict interface to append().
+        """
+        return self.append(
+            action     = data.get("action", "FILTER"),
+            entity_id  = data.get("source", "unknown"),
+            actor_id   = data.get("component"),
+            metadata   = {
+                "input":    data.get("input", "")[:200],   # Truncate for storage
+                "output":   data.get("output", "")[:200],
+                "blocked":  data.get("blocked", False),
+                "scrubbed": data.get("scrubbed", False),
+                "reason":   data.get("reason", ""),
+            },
+            safe       = data.get("safe", True),
+        )
 
     def _current_seq(self) -> int:
         if not self.path.exists():
@@ -155,18 +137,11 @@ class AuditLedger:
             f.write(json.dumps(entry) + "\n")
 
     def verify_chain(self) -> dict:
-        """
-        Verify the entire audit chain integrity.
-        Returns report of any broken links or tampered entries.
-        Used by IT department for forensic verification.
-        """
         if not self.path.exists():
             return {"valid": True, "entries": 0, "broken": []}
-
-        lines   = self.path.read_text().strip().splitlines()
-        broken  = []
-        prev    = "GENESIS"
-
+        lines  = self.path.read_text().strip().splitlines()
+        broken = []
+        prev   = "GENESIS"
         for i, line in enumerate(lines):
             try:
                 entry    = json.loads(line)
@@ -176,44 +151,29 @@ class AuditLedger:
                     entry.get("prev_hash", "GENESIS"),
                 )
                 if stored != expected:
-                    broken.append({
-                        "seq":      entry.get("seq", i),
-                        "audit_id": entry.get("audit_id"),
-                        "reason":   "hash_mismatch",
-                    })
+                    broken.append({"seq": entry.get("seq", i), "reason": "hash_mismatch"})
                 if entry.get("prev_hash") != prev:
-                    broken.append({
-                        "seq":      entry.get("seq", i),
-                        "audit_id": entry.get("audit_id"),
-                        "reason":   "chain_break",
-                    })
+                    broken.append({"seq": entry.get("seq", i), "reason": "chain_break"})
                 prev = stored
             except Exception as e:
                 broken.append({"seq": i, "reason": f"parse_error: {e}"})
-
         return {
-            "valid":      len(broken) == 0,
-            "entries":    len(lines),
-            "broken":     broken,
+            "valid":       len(broken) == 0,
+            "entries":     len(lines),
+            "broken":      broken,
             "verified_at": datetime.now(timezone.utc).isoformat(),
         }
 
     def query(
         self,
-        entity_id:  Optional[str] = None,
-        actor_id:   Optional[str] = None,
-        action:     Optional[str] = None,
-        date_from:  Optional[str] = None,
-        date_to:    Optional[str] = None,
+        entity_id: Optional[str] = None,
+        actor_id:  Optional[str] = None,
+        action:    Optional[str] = None,
+        date_from: Optional[str] = None,
+        date_to:   Optional[str] = None,
     ) -> list:
-        """
-        Query audit entries. Used by IT for law enforcement requests.
-
-        Returns list of matching entries in chronological order.
-        """
         if not self.path.exists():
             return []
-
         results = []
         for line in self.path.read_text().strip().splitlines():
             try:
@@ -221,26 +181,16 @@ class AuditLedger:
                 if entity_id and entry.get("entity_id") != entity_id \
                              and entry.get("related_id") != entity_id:
                     continue
-                if actor_id  and entry.get("actor_id")  != actor_id:
-                    continue
-                if action    and entry.get("action")     != action.upper():
-                    continue
-                if date_from and entry.get("timestamp", "") < date_from:
-                    continue
-                if date_to   and entry.get("timestamp", "") > date_to:
-                    continue
+                if actor_id  and entry.get("actor_id")  != actor_id:  continue
+                if action    and entry.get("action")     != action.upper(): continue
+                if date_from and entry.get("timestamp",  "") < date_from:   continue
+                if date_to   and entry.get("timestamp",  "") > date_to:     continue
                 results.append(entry)
             except Exception:
                 continue
-
         return results
 
     def forensic_export(self, entity_id: str) -> dict:
-        """
-        Export full forensic record for a single entity.
-        Used for law enforcement requests — returns everything
-        related to this SUID from the audit chain.
-        """
         entries = self.query(entity_id=entity_id)
         return {
             "entity_id":    entity_id,
@@ -252,7 +202,6 @@ class AuditLedger:
         }
 
 
-# Module-level singleton
 _ledger = None
 
 def get_ledger() -> AuditLedger:
