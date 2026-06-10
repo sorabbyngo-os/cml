@@ -28,7 +28,7 @@ from typing import Optional
 
 log = logging.getLogger("cml.client")
 
-NATS_URL      = os.environ.get("NATS_URL", "nats://localhost:4223")
+NATS_URL      = os.environ.get("NATS_URL", "nats://localhost:4222")
 CML_TIMEOUT   = float(os.environ.get("CML_TIMEOUT_S", "5.0"))
 
 # Subjects
