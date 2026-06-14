@@ -20,7 +20,7 @@ COPY . .
 RUN mkdir -p /etc/sorabbyngo/cml
 VOLUME ["/etc/sorabbyngo/cml"]
 
-ENV NATS_URL=nats://localhost:4223
+ENV NATS_URL=nats://localhost:4222
 ENV CML_LEDGER_PATH=/etc/sorabbyngo/cml/audit.jsonl
 ENV CML_FAIL_OPEN=true
 ENV HOSPITAL_REGION=KE047
